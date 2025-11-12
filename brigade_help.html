@@ -1,0 +1,204 @@
+<html>
+<head>
+<meta charset='UTF-8'>
+<style>
+body {
+    margin: .5in;
+    margin-bottom: 1in;
+}
+body, pre, td {
+    font-size: 20pt;
+}
+body, pre, td {
+    font-family: Arial;
+}
+ol {
+    margin-bottom: 5mm;
+}
+li {
+    margin-top: 1.5mm;
+}
+.cmd {
+    color: darkred;
+}
+a {
+    text-decoration: none;
+    color: blue;
+}
+.head {
+    font-weight: bold;
+    font-size: 25pt;
+    margin-top: 10mm;
+    margin-bottom: 5mm;
+}
+</style>
+</head>
+<body>
+<pre>
+This page explains how to use the VISIBILITY BRIGADE utility.
+It helps you manage your letters and messages.
+
+It lives here: <a href='https://logicalpoetry.com/vb'>logicalpoetry.com/vb</a>
+
+There is a very comprehensive <a target=blank href='https://drive.google.com/file/d/13DXyvaHWtYu4XCxvJGVm83wPWaQSkHxD/view'>National Visibility Brigade Toolkit</a>.
+
+The letters are ALL UPPERCASE.
+
+In the text field you enter potential messages and also various ‟commands”.
+
+You first do a one-time initialization:<ol><li>Create a brigade by giving a name and optionally a password.
+<li>Give the brigade a title and optionally an attachment type.
+<li>Add all of your letters specifying how many you have of each.
+<li>The letter boards default to black.  Change this to white if needed.
+</ol>
+You can then test messages to see if you have enough letters.
+After a message is used on the bridge you can add it to a historical list.
+
+<hr width=900 align=left>
+<div class=head class=head>Brigades</div>Create a new Visibility Brigade:
+<span class=cmd>NEW &lt;NAME&gt; &lt;PASSWORD&gt;</span>   (no spaces in name or password)
+or
+<span class=cmd>NEW &lt;NAME&gt;</span>          (no spaces in name - no password is wanted)
+
+Sometimes you have two sets of letters and you need
+to switch between their brigades.
+
+Switch to a Visibility Brigade:
+<span class=cmd>V &lt;NAME&gt; &lt;PASSWORD&gt;</span>   (switch to the named brigade with password)
+<span class=cmd>V &lt;NAME&gt;</span>                    (switch to the named brigade that has no password)
+
+If you exit the browser the current brigade will be remembered for
+when you return.
+
+
+For the current brigade:
+
+<span class=cmd>TL &lt;TITLE&gt;</span>       (spaces are okay in TITLE)
+    The title is displayed at the top.
+    It can be a longer description than the shorter brigade name.
+
+Letters are attached to the fence in a variety of ways.
+
+<span class=cmd>AT &lt;TYPE&gt;</span>       (AT = attachment type. no spaces in TYPE)
+    TYPE can be:
+        PVC             (polyvinyl chloride pipes)
+        HOOK
+        ROPE
+    
+    AT by itself will show the attachment type.
+
+<span class=cmd>BC &lt;COLOR&gt;</span>            (set letter board color)
+                                   (COLOR is either BLACK or WHITE)
+
+<span class=cmd>PW &lt;PASSWORD&gt;</span>    (change Password - no spaces in password)
+<span class=cmd>PW -</span>                            (remove the Password)
+
+<span class=cmd>RN &lt;NEW NAME&gt;</span>    (rename the brigade, no spaces in new name)
+
+<div class=head>Letters</div><span class=cmd>BA &lt;LETTER&gt; ## ...</span>      (BA = Bulk Add)
+
+    LETTER is a single character or one of these two letter sequences:
+        SP   space
+        HT   red heart <span style='color: red;'>&#10084;</span>
+        DN   down arrow <span style='font-size: 23pt; font-weight: bold;'>&#8595;</span>
+        UP   up arrow <span style='font-size: 23pt; font-weight: bold;'>&#8593;</span>
+
+    ## is a number - how many of the LETTER you have
+
+    You can have multiple &lt;LETTER&gt; ## in a row like this:
+
+        BA A 3 B 4 C 2 D 3 E 10 ! 1 $ 2 SP 8</span>
+
+    LETTER can be <i>any</i> character including
+        punctuation (non alpha-numeric) characters.
+        There <i>is</i> one exception: tilde <span style='font-size: 224t;'>~</span> is not permitted.
+
+<span class=cmd>+&lt;LETTER&gt;</span>      (increment the number for the letter)
+<span class=cmd><span style='font-size: 32;'>-</span>&lt;LETTER&gt;</span>      (decrement the number for the letter)
+
+<span class=cmd>L</span>               (List all of the letters and numbers and the total)
+<div class=head>Messages</div>To test a message to see if there are enough letters
+enter the message in the text field and hit Return.
+
+If there are not enough letters to make the message you will see
+       which additional letters need to be made.
+If there are not enough 0s or 1s it will substitute O for 0 and I for 1.
+
+If there ARE enough letters it will say “Okay &#128077; &#128522;”
+or
+If there are NOT enough letters it will say “IF those are made ...”
+
+    and then it will display:
+
+    - how many total letter boards are needed for the message
+
+    If the attachment type is PVC it will show:
+
+        - how the message <i>actually</i> look when supported by the PVC pipes
+        - how many T, J, I, and S pipes are needed to support the message
+        <table style='margin-left: 16mm;'>
+        <tr><td>T</td><td>- pipe with a “tee”</td></tr>
+        <tr><td>J</td><td>- pipe with a “union connector”</td></tr>
+        <tr><td>I</td><td>- a plain pipe</td></tr>
+        <tr><td>S</td><td>- a short pipe</td></tr>
+        </table>
+You can click on the displayed message to copy it to the clipboard
+so you can easily paste it.  Perhaps you want to modify it or
+try the message in another brigade that has a different set of letters.
+
+To add a message to the message history:
+
+<span class=cmd>&lt;DATE&gt; &lt;MESSAGE&gt;</span>
+
+    where DATE can be:
+
+        4/5/2025
+        4/5/25
+        4/5     (current year)
+        4       (current month/year)
+        T       (today)
+
+    if MESSAGE is just a dash ‘-’, the message on that date will be deleted
+
+With a successful Okay message displayed on the screen
+you can easily add it to the history with this:
+
+<span class=cmd>U &lt;DATE&gt;</span>        (Use this message on the date)    
+
+Note that you CAN add more than one message on a given date.
+
+<span class=cmd>H</span>
+    Show the complete message History in two columns: Date and Message
+    with the most recent dates first.
+
+    At the bottom is a link: <span style='color: blue'>CSV Export</span>.
+    Clicking on it will download a comma-separated-value formatted file
+    that you can open in a spreadsheet.
+<div class=head>Log</div><span class=cmd>LG</span>                  (show a time stamped log of activity)
+
+<span class=cmd>LG CLEAR</span>     (clear the log)
+
+<div class=head>Bookmarks</div>You can make a bookmark to go directly to your brigade.
+
+If you have just one brigade this is the URL to bookmark:
+
+    logicalpoetry.com/vb
+
+If you have more than one set of letters and the brigade name is XXX 
+this is the URL to bookmark:
+
+    logicalpoetry.com/cgi-bin/vb?cmd=v+XXX
+
+and if it has a password of YYY:
+
+    logicalpoetry.com/cgi-bin/vb?cmd=v+XXX+YYY
+
+<hr width=900 align=left>
+Any questions?
+
+Contact me for a forgotten password.
+
+Jon Bjornstad<br><a href='mailto:Jon Bjornstad <jon.bjornstad@gmail.com>?subject=Visibility Brigade Utility'>jon.bjornstad@gmail.com</a><br>415-246-6499
+</pre>
+</body>
+</html>

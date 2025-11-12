@@ -1,0 +1,7 @@
+#!/bin/sh
+scp lp:/home/logical9/www/vb/* \
+    lp:/home/logical9/www/cgi-bin/vb \
+    lp:/home/logical9/www/cgi-bin/VB_SVG.pm \
+    lp:/home/logical9/www/cgi-bin/brigades/DB.dbm \
+    lp:/home/logical9/www/cgi-bin/brigades/DW.dbm \
+    .
