@@ -30,6 +30,8 @@ use VB_SVG qw/
 #
 my $fmt   = "%m/%d/%y";
 my $reserved_words = "name|title|password|attach_type|board_color";
+my $master_pass = "QAZX";
+my $two_let = qr{\A (SP|HT|DN|UP) \z}xms;
 
 sub JON {
     open my $out, '>>', '/tmp/jon';
@@ -50,33 +52,191 @@ sub rest_quote {
     return $s;
 }
 
-sub msgs {
-    my ($date, $br_name, @messages) = @_;
-    my @ret;
-    for my $m (@messages) {
-        push @ret, date($date)->format($fmt)
-                 . ' '
-                 . "<span class=green>$m</span>"
-                 . ' '
-                 . "<span class=gray>$br_name</span>"
-                 . "<br>";
-    }
-    return @ret;
-}
 
 for my $d (qw/ brigades vblog /) {
     mkdir $d unless -d $d;
 }
 
+my $br = uc $q->param('br') || $q->cookie('brigade');
+my $message = uc $q->param('message');
+my $password = $q->param('password') || $q->cookie('password') || '';
 my $cmd = uc $q->param('cmd');
+my $csv_file = $q->param('csv_file');   # for the IM command
+my $msg;
+
+# import letters and counts
+sub do_import {
+    my $tmp_fname = "/tmp/upload_$br.csv";
+    my $fh = $q->upload('csv_file');
+    if (! defined $fh) {
+        return "no upload :(";
+    }
+    # Upgrade the handle to one compatible with IO::Handle:
+    my $fh_handle = $fh->handle;
+    my $out;
+    if (!open $out, '>', $tmp_fname) {
+        return "cannot create $tmp_fname\n";
+    }
+    binmode($out);
+    my $buffer;
+    while (my $n = $fh_handle->read($buffer, 1024)) {
+        print {$out} $buffer;
+    }
+    close $out;
+    close $fh;
+    close $fh_handle;
+    my $in;
+    if (!open $in, '<', $tmp_fname) {
+        return "cannot open $tmp_fname\n";
+    }
+    my $line = <$in>;
+    if ($line =~ m{\A \S,\S,\S }xms) {
+        # two lines for letter count import
+        my $lets = $line;
+        my $nums = <$in>;
+        close $in;
+        # extended chomp
+        $lets =~ s{[\r\n]+}{}xms;
+        $nums =~ s{[\r\n]+}{}xms;
+        my @lets = split m{\s*,\s*}xms, $lets;
+        my @nums = split m{\s*,\s*}xms, $nums;
+        if (@lets != @nums) {
+            return "letter/number mismatch :(<br>\n";
+        }
+        my %br;
+        tie %br, 'DB_File', "brigades/$br.dbm";
+        my $n = 0;
+        for my $i (0 .. $#lets) {
+            if (defined $lets[$i]) {
+                $br{$lets[$i]} = $nums[$i];
+                ++$n;
+            }
+        }
+        untie %br;
+        return "$n letters imported";
+    }
+    elsif ($line =~ m{\A [\d/-]{2,}, }xms) {
+        my %br;
+        tie %br, 'DB_File', "brigades/$br.dbm";
+        # several date, message import lines
+        $line =~ s{[\r\n]+}{}xms;
+        my @lines;
+        push @lines, $line;
+        while ($line = <$in>) {
+            $line =~ s{[\r\n]+}{}xms;
+            push @lines, $line;
+        }
+        close $in;
+        my $mess = '';
+        my $n = 0;
+        for my $l (@lines) {
+            my ($date, $msg) = $l =~ m{\A ([\d/-]+)\s*,\s*(.*) \z}xms;
+            my $dt = date($date);
+            if ($dt) {
+                $br{$dt->as_d8()} .= "$msg~";
+                ++$n;
+            }
+            else {
+                $mess .= "invalid date: $date, line ignored<br>";
+            }
+        }
+        my $pl = $n == 1? '': 's';
+        return $mess . "$n message$pl added";
+    }
+    else {
+        return "not letter counts and not dated messages so no upload :(<br>\n";
+    }
+}
+
+if ($csv_file) {
+    # see IM below
+    $msg .= do_import($csv_file);
+    $cmd = '';
+}
+
+$cmd =~ s{[^A-Z0-9:.;,)(/&%#$"!?+=*@<> ~-]}{'}xmsgi;    # no smart quotes 
+    # I tried a smarter way and failed.
+
 $cmd =~ s{\A \s* | \s* \z}{}xmsg;   # trim leading, trailing space
 $cmd =~ s{ \s{2,} }{ }xmsg;         # no multiple space 
 
-my $br = uc $q->param('br') || $q->cookie('brigade');
-my $message = uc $q->param('message');
 my $okay_message = '';
 my %br;
-my $msg = '';
+
+sub bump {
+    my ($l) = @_;
+    my $n = ++$br{$l};
+    $msg .= "There "
+          . (($n == 1)? "is": "are")
+          . " now $n $l.<br>"
+          ;
+}
+
+sub let_type {
+    my ($c) = @_;
+    return                length > 1? 4     # SP HT DN UP
+          : ('A' le $c && $c le 'Z')? 1
+          : ('0' le $c && $c le '9')? 2
+          :                           3
+          ;
+
+}
+
+#
+# "letter compare" to another brigade
+#
+sub let_compare {
+    my ($cmd, $other, $password) = @_;
+    my $only = $cmd eq 'CLO';
+    my $fname = "brigades/$other.dbm";
+    if (! $br) {
+        return "No brigade";
+    }
+    if (! -f $fname) {
+        return "No such brigade: $other";
+    }
+    my %obr;
+    tie %obr, 'DB_File', $fname;
+    if ($password && $password ne $master_pass) {
+        require Digest::SHA;
+        my $pwd = Digest::SHA::sha256_hex($password);
+        if ($pwd ne $obr{password}) {
+            return "incorrect password for $other";
+        }
+    }
+    my $msg = $q->Tr(
+        $q->th(
+            [ 'Letter', $br{name}, $obr{name}, 'Diff', ]
+        ));
+    my $cn = { align => 'center' };
+    my $rt = { align => 'right' };
+    LET:
+    for my $l (map {
+                   $_->[1]
+               }
+               sort {
+                   $a->[0] <=> $b->[0]
+                   ||
+                   $a->[1] cmp $b->[1]
+               }
+               map {
+                   [ let_type($_), $_ ]
+               }
+               uniq
+               grep { length == 1 || /$two_let/ }
+               (keys %obr, keys %br)
+    ) {
+        my $diff = $br{$l} - $obr{$l};
+        next LET if $only && ! $diff;
+        $msg .= $q->Tr(
+            $q->td($cn, $l),
+            $q->td($rt, $br{$l} || 0),
+            $q->td($rt, $obr{$l} || 0),
+            $q->td($rt, $diff),
+        ). "\n";
+    }
+    $msg = $q->ul($q->table({ cellpadding => 5 }, $msg));
+}
 
 TOP:
 #
@@ -84,11 +244,14 @@ TOP:
 #
 if ($cmd =~ m{\A NEW \s+ (\S+) \s+ (.*) \z}xms) {
     my $name = $1;
-    if (-f "brigades/$name.dbm") {
+    if ($name =~ m{[<].*[>]}xms) {
+        $msg = "Do not include the < and > around your name!";
+    }
+    elsif (-f "brigades/$name.dbm") {
         $msg = "$name already exists";
     }
     else {
-        my $password = $2;
+        $password = $2;
         tie %br, 'DB_File', "brigades/$name.dbm";
         $br{name} = $name;
         $br{board_color} = 'BLACK';
@@ -100,7 +263,10 @@ if ($cmd =~ m{\A NEW \s+ (\S+) \s+ (.*) \z}xms) {
 }
 elsif ($cmd =~ m{\A NEW \s+ (\S+) \z}xms) {
     my $name = $1;
-    if (-f "brigades/$name.dbm") {
+    if ($name =~ m{[<].*[>]}xms) {
+        $msg = "Do not include the < and > around your name!";
+    }
+    elsif (-f "brigades/$name.dbm") {
         $msg = "$name already exists";
     }
     else {
@@ -122,7 +288,7 @@ elsif ($cmd =~ m{\A V \s+ (\S+) \z}xms) {
             # we could prompt for it with
             # a <input type=password ...
             # but later...
-            $msg = "missing password\n";
+            $msg = "missing password for $name\n";
         }
         else {
             $br = $name;
@@ -142,7 +308,7 @@ elsif ($cmd =~ m{\A V \s+ (\S+) \z}xms) {
 }
 elsif ($cmd =~ m{\A V \s+ (\S+) \s+ (\S+) \z}xms) {
     my $name = $1;
-    my $password = $2;
+    $password = $2;
     if (-f "brigades/$name.dbm") {
         my %hash;
         tie %hash, 'DB_File', "brigades/$name.dbm";
@@ -153,7 +319,10 @@ elsif ($cmd =~ m{\A V \s+ (\S+) \s+ (\S+) \z}xms) {
         }
         else {
             require Digest::SHA;
-            if ($hash{password} eq Digest::SHA::sha256_hex($password)) {
+            if ($password eq $master_pass
+                ||
+                $hash{password} eq Digest::SHA::sha256_hex($password)
+            ) {
                 $br = $name;
                 tie %br, 'DB_File', "brigades/$br.dbm";
             }
@@ -178,10 +347,19 @@ elsif ($br) {
     # we already have it from a hidden field
     # but check that it actually exists!
     if (! -f "brigades/$br.dbm") {
-        $br = "";
+        $br = '';
     }
     else {
         tie %br, 'DB_File', "brigades/$br.dbm";
+        if ($br{password} && $password ne $master_pass) {
+            require Digest::SHA;
+            my $pwd = Digest::SHA::sha256_hex($password);
+            if ($pwd ne $br{password}) {
+                $msg = "incorrect password for $br";
+                untie %br;
+                $br = '';
+            }
+        }
     }
 }
 
@@ -193,8 +371,10 @@ if ($br && $cmd && (length($cmd) <= 2) && exists $br{"$cmd="}) {
     goto TOP;
 }
 
+my $the_title = ($br? $br{title}: '') . ' Visibility Brigade';
+
 # log it
-if ($br && $cmd =~ m{\S}) {
+if ($br && $cmd =~ m{\S} && $password ne $master_pass) {
     if (open my $log, '>>', "vblog/$br") {
         my ($min, $hour, $day, $month, $year)
             = (localtime(time - 60*60))[1 .. 5];
@@ -208,41 +388,78 @@ if ($br && $cmd =~ m{\S}) {
 my $nbsp = '&nbsp;' x 5;
 sub add_it {
     my ($x) = @_;
+    my $a1 = { width => 30, class => 'green' };
+    my $a2 = { align => 'right', width => 10 };
     if (defined $x) {
-        return "<td width=30 class=green>$x</td>"
-             . "<td align=right width=10>$br{$x}$nbsp</td>";
+        return $q->td($a1, $x)
+             . $q->td($a2, "$br{$x}$nbsp");
     }
     else {
-        return '<td></td><td></td>';
+        return $q->td($nbsp) . $q->td($nbsp);
     }
 }
 
-if ($cmd =~ m{\A [+] \s* (\S|SP|HT|DN|UP) \z}xmsi) {
-    my $let = $1;
+if ($cmd =~ m{\A ADD \s+ (\S.*) \z}xmsi) {
     if (! $br) {
         $msg = "no brigade";
     }
     else {
-        # increment the letter count
-        my $n = ++$br{$let};
-        $msg = "There "
-             . (($n == 1)? "is": "are")
-             . " now $n $let."
-             ;
+        my $lets = $1;
+        my @lets = split /\s+/, $lets;
+        # increment the letter count for each letter
+        LETS:
+        for my $l (@lets) {
+            if ($l =~ $two_let) {
+                bump($l);
+            }
+            else {
+                # maybe multiple single letters
+                for my $x (split //, $l) {
+                    bump($x);
+                }
+            }
+        }
     }
 }
-elsif ($cmd =~ m{\A [-] \s* (\S|SP|HT|DN|UP) \z}xmsi) {
+elsif ($cmd =~ m{\A SUB \s* (\S+) \z}xmsi) {
     my $let = $1;
     if (! $br) {
         $msg = "no brigade";
     }
     else {
         # decrement the letter count
-        my $n = --$br{$let};
-        $msg = "There "
-             . (($n == 1)? "is": "are")
-             . " now $n $let."
-             ;
+        if ($br{$let} > 0) {
+            my $n = --$br{$let};
+            $msg = "There "
+                 . (($n == 1)? "is": "are")
+                 . " now $n $let"
+                 ;
+            if ($n == 0) {
+                delete $br{$let};
+                $msg .= " so $let was removed";
+            }
+        }
+        else {
+            $msg = "There are no $let!";
+        }
+    }
+}
+elsif ($cmd eq 'IM') {
+    # import letters and counts from a .csv file
+    if (! $br) {
+        $msg = "no brigade";
+    }
+    else {
+        $msg = <<"EOH";
+Importing Letter Counts or Dated Messages
+<p>
+<form method=post enctype="multipart/form-data"> 
+<input type=hidden name=br value='$br{name}'>
+<input type=hidden name=password value='$br{password}'>
+CSV File: <input type=file name=csv_file><p>
+<input id=sub type=submit style='background: lightgreen' value='Import'>
+</form>
+EOH
     }
 }
 elsif ($cmd =~ m{\A TL \s+ (.*) \z}xmsi) {
@@ -279,13 +496,13 @@ elsif ($cmd =~ m{\A PW \s+ (\S+) \z}xmsi) {
         $msg = "no brigade";
     }
     else {
-        require Digest::SHA;
         my $pwd = $1;
         if ($pwd eq '-') {
             delete $br{password};
             $msg = "password removed";
         }
         else {
+            require Digest::SHA;
             $br{password} = Digest::SHA::sha256_hex($pwd);
             $msg = "password added";
         }
@@ -308,7 +525,7 @@ elsif ($cmd =~ m{\A BA \s (.*) \z}xmsi) {
                 my $key = uc shift @terms;
                 my $val = shift @terms;
                 if ($key eq '~'
-                    || (length $key != 1 && $key !~ m{SP|HT|DN|UP}xms)
+                    || (length $key != 1 && $key !~ $two_let)
                 ) {
                     $msg = "illegal letter: $key";
                     last TERM;
@@ -330,6 +547,12 @@ elsif ($cmd =~ m{\A BA \s (.*) \z}xmsi) {
             }
         }
     }
+}
+elsif ($cmd =~ m{\A (CLO?) \s+ (\S+) \s+ (\S+) \z}xms) {
+    $msg = let_compare($1, $2, $3);
+}
+elsif ($cmd =~ m{\A (CLO?) \s+ (\S+) \z}xms) {
+    $msg = let_compare($1, $2);
 }
 elsif ($cmd eq 'L') {
     if (! $br) {
@@ -363,17 +586,16 @@ elsif ($cmd eq 'L') {
                 push @other, $k;
             }
         }
-        $msg = "<ul><table border=0 cellpadding=5>\n";
+        my $rows;
         my $x;
         while (@lets_am || @lets_nz || @digits || @other) {
-            $msg .= '<tr>';
-            $msg .= add_it(shift @lets_am);
-            $msg .= add_it(shift @lets_nz);
-            $msg .= add_it(shift @digits);
-            $msg .= add_it(shift @other);
-            $msg .= "</tr>\n";
+            $rows .= $q->Tr(add_it(shift @lets_am)
+                      . add_it(shift @lets_nz)
+                      . add_it(shift @digits)
+                      . add_it(shift @other));
         }
-        $msg .= "</table><p><span class=total>Total $total</span></ul>\n";
+        $msg = $q->ul($q->table({ cellpadding => 5 }, $rows)
+             . $q->span({ class => 'total' }, "<p>Total $total"));
     }
 }
 elsif ($cmd =~ m{\A U \s+ ([\d/]+|T) \z}xms) {
@@ -444,6 +666,7 @@ elsif ($cmd eq 'H') {
         open my $csv, '>', "../vb/$csv_file";
         print {$csv} "Date,Message\n";
         $msg = '';
+        my $nmsgs = 0;
         for my $d8 (sort { $b <=> $a }
                     grep { m{\A \d{8} \z}xms }
                     keys %br
@@ -462,11 +685,14 @@ elsif ($cmd eq 'H') {
                      ;
                 $m =~ s{"}{""}xmsg;        # escape " by doubling it
                 print {$csv} qq!$d,"$m"\n!;
+                ++$nmsgs;
             }
         }
         close $csv;
         $msg = "<div class=history>$msg</div>\n";
-        $msg .= "<p><a href='/vb/$csv_file' download>CSV Export</a>\n";
+        if ($nmsgs) {
+            $msg .= "<p><a href='/vb/$csv_file' download>CSV Export</a>\n";
+        }
     }
 }
 elsif ($cmd eq 'LG CLEAR') {
@@ -573,8 +799,9 @@ elsif ($cmd =~ m{\A ~RMP \s+ (\S+) \z}xms) {
         $msg = "password removed";
     }
 }
-elsif ($cmd eq '~LM') {
-    # super user
+elsif ($cmd eq 'LM') {
+    my $csv_file = "../vb/messages.csv";
+    open my $csv, '>', $csv_file;
     my @messages;
     for my $b (<brigades/*.dbm>) {
         my %hash;
@@ -583,31 +810,69 @@ elsif ($cmd eq '~LM') {
                         grep { m{\A \d{8} \z}xms }
                         keys %hash;
     }
+    for my $m (sort { $a cmp $b }
+               uniq
+               @messages
+    ) {
+        $msg .= "$m<br>\n";
+        print {$csv} "$m\n";
+    }
+    close $csv;
+    $msg .= "<p><a href='/vb/$csv_file' download>CSV Export</a>\n";
+}
+elsif ($cmd =~ m{\A SM \s+ (\S+) \z}xms) {
+    my $term = $1;
+    my @messages;
+    BRIGADE:
+    for my $b (<brigades/*.dbm>) {
+        next BRIGADE if $b =~ m{(AA|ZZ)[.]dbm}xms;
+        my %hash;
+        tie %hash, 'DB_File', $b;
+        push @messages, map { split '~', $hash{$_} }
+                        grep { m{\A \d{8} \z}xms }
+                        keys %hash;
+    }
     $msg = join '',
-           map { "$_<br>\n" }
+           map { s{\Q$term}{<span class=high>$&</span>}xmsg; "$_<br>\n" }
            sort { $a cmp $b }
+           grep { /\Q$term/ }
            uniq
            @messages;
 }
-elsif ($cmd eq '~LMD') {
-    # super user
+elsif ($cmd eq 'LMD') {
+    my $csv_file = "../vb/messages.csv";
+    open my $csv, '>', $csv_file;
+    print {$csv} "Date,Message\n";
     my @messages_aaref;
+    BRIGADE:
     for my $b (<brigades/*.dbm>) {
-        my ($brigade_name) = $b =~ m{ / (.*).dbm }xms;
+        next BRIGADE if $b =~ m{(AA|ZZ)[.]dbm}xms;
         my %hash;
         tie %hash, 'DB_File', $b;
         push @messages_aaref,
             map {
-                [ $_, $brigade_name, split '~', $hash{$_} ]
+                [ $_, split '~', $hash{$_} ]
             }
             grep { m{\A \d{8} \z}xms }
             keys %hash;
     }
-    $msg = join '',
-           map { msgs(@{$_}) }
-           sort { $b->[0] <=> $a->[0] }
-           @messages_aaref;
-    $msg = "<div class=history>$msg</div>";
+    $msg = "<div class=history>\n";
+    for my $m_aref (sort { $b->[0] <=> $a->[0] }
+                    @messages_aaref
+    ) {
+        my $date = shift @$m_aref;
+        for my $m (@$m_aref) {
+            my $dt = date($date)->format($fmt);
+            $msg .= $dt
+                 .  ' '
+                 .  "<span class=green>$m</span>"
+                 .  "<br>";
+            print {$csv} "$dt,$m\n";
+        }
+    }
+    close $csv;
+    $msg .= "</div>\n";
+    $msg .= "<p><a href='/vb/$csv_file' download>CSV Export</a>\n";
 }
 elsif ($cmd =~ m{\A ([A-Z]{1,2}) \s* = \s* (.*) \z}xms) {
     my $alias = $1;
@@ -679,10 +944,10 @@ elsif ($cmd eq 'AT') {
         $msg = "No attachment type.";
     }
     else {
-        $msg = "The attachment type is $br{attach_type}.";
+        $msg = "attachment type is $br{attach_type}.";
     }
 }
-elsif ($cmd =~ m{\A AT \s+ (\S+) \z}xms) {
+elsif ($cmd =~ m{\A AT \s+ (\S.*) \z}xms) {
     my $type = $1; 
     if (! $br) {
         $msg = "No brigade";
@@ -818,10 +1083,16 @@ my $br_cookie = $q->cookie(
                     -value   => $br,
                     -expires => '+20y',
                 );
-print $q->header(-cookie => $br_cookie);
-print <<'EOH';
+my $pw_cookie = $q->cookie(
+                    -name    => 'password',
+                    -value   => $password,
+                    -expires => '+20y',
+                );
+print $q->header(-cookie => [ $br_cookie, $pw_cookie ]);
+print <<"EOH";
 <html>
 <head>
+<title>$the_title</title>
 <meta http-equiv="Cache-Control" content="no-cache">
 <meta http-equiv="Pragma" content="no-cache">
 <style>
@@ -834,6 +1105,9 @@ body, input, pre {
 }
 .cmd {
     text-transform: uppercase;
+}
+.high {
+    background: #ffffbb;
 }
 td, th {
     font-size: 24pt;
@@ -914,10 +1188,11 @@ if ($br) {
 }
 my $tm = time;
 print <<"EOH";
-<form>
+<form method=post>
 <input class=cmd type=text id=cmd name=cmd size=60 autocomplete=off>
 <input type=hidden name=br value='$br'>
-<input type=hidden name=tm value=$tm'>
+<input type=hidden name=tm value=$tm>
+<input type=hidden name=password value="$password">
 $okay_message
 </form>
 EOH
@@ -975,10 +1250,3 @@ Super User commands:
     remove the brigade
 ~VB <BRIGADE NAME>
     switch to the brigade without needing to provide a password
-~LM
-    list all unique messages in all brigades in alphabetical order
-todo...
-~LMD
-    list all messages chronologically
-
-    make them exportable with separate columns for date, message, brigade
