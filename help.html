@@ -1,0 +1,285 @@
+<html>
+<head>
+<meta charset='UTF-8'>
+<style>
+body {
+    margin: .5in;
+    margin-bottom: 1in;
+    width:: 80%;
+}
+body, pre, td {
+    font-size: 20pt;
+}
+body, pre, td {
+    font-family: Arial;
+}
+ol {
+    margin-bottom: 5mm;
+}
+li {
+    margin-top: 1.5mm;
+}
+.cmd {
+    color: darkred;
+}
+a {
+    text-decoration: none;
+    color: blue;
+}
+.blue {
+    color: blue;
+}
+ul {
+    margin-top: 5mm;
+    margin-bottom: 5mm;
+}
+.red {
+    color: red;
+}
+</style>
+</head>
+<body>
+<h1>VB Letter Tool</h1>
+<h2>Introduction</h2>
+This page explains how to use the VISIBILITY BRIGADE letter tool.
+It helps you manage your letters and messages.  The user interface for
+this tool is rather unorthodox.  It is basically a command line program.
+It <b>does</b> work but could not be called "user friendly". &#128522;
+<p>
+It lives here: <a href='https://logicalpoetry.com/vb'>logicalpoetry.com/vb</a>
+<p>
+Here is <b><a target=_blank href='https://www.youtube.com/watch?v=zQyswPZ42VY'>a video</a></b> that explains how it works.
+<p>
+Any questions?<br>Contact Jon Bjornstad <a href='mailto:Jon Bjornstad <jon.bjornstad@gmail.com>?subject=Visibility Brigade Utility'>jon.bjornstad@gmail.com</a> 415-246-6499
+<p>
+Here is the <a target=_blank href='https://visibilitybrigade.com'>National Visibility Brigade web site</a>.<br>
+They have a very comprehensive <a target=blank href='https://drive.google.com/file/d/13DXyvaHWtYu4XCxvJGVm83wPWaQSkHxD/view'>Toolkit</a>.
+<p>
+In the text field you enter potential messages and also various ‟commands”.
+<p>
+You first do a <b>one-time</b> initialization:<ol><li>Create a brigade by giving a name and optionally a password.
+<li>Give the brigade a title and optionally an attachment type.
+<li>Add all of your letters specifying how many you have of each.
+<li>The letter boards default to black.  Change this to white if needed.
+</ol>
+You can then test messages to see if you have enough letters.
+After a message is used on the bridge you can add it to a historical list.
+<p>
+The letters are ALL UPPERCASE.
+<h2>Brigades</h2>
+Create a new Visibility Brigade (aka 'Letter Set'):<p>
+<span class=cmd>NEW &lt;NAME&gt; &lt;PASSWORD&gt;</span> <span style='margin-left: 1in'></span><br>
+or<br>
+<span class=cmd>NEW &lt;NAME&gt;</span><span style='margin-left: 1.6in'>(no password is wanted)
+<p>
+<ul>
+The name should be short and composed only of letters and numbers.<br>
+The password cannot contain a space.
+</ul>
+Sometimes you have two sets of letters.<br>
+Switch between them with the V command:
+<p>
+<span class=cmd>V &lt;NAME&gt; &lt;PASSWORD&gt;</span><span style='margin-left: .4in;'>(switch to the named brigade with password)</span><br>
+<span class=cmd>V &lt;NAME&gt;</span><span style='margin-left: 1.5in'>(switch to the named brigade that has no password)</span>
+<p>
+If you exit the browser the current brigade will be remembered for
+when you return.
+<p>
+For the current brigade:
+<p>
+<span class=cmd>TL &lt;TITLE&gt;</span><span style='margin-left: 1.4in;'>(spaces are okay in TITLE)</span>
+<p>
+The title is displayed at the top.
+It can be a longer description than the shorter brigade name.
+<p>
+Letters are attached to the fence in a variety of ways.  Optionally, you can use:
+<p>
+<span class=cmd>AT &lt;TYPE&gt;</span><span style='margin-left: 1.4in;'>(AT = Attachment Type)</span><br>
+<pre>
+    TYPE can be:
+        PVC             (Polyvinyl Chloride pipes)
+        HOOK
+        ROPE
+        ZIP TIES
+        etc.
+</pre>
+<span class=cmd>AT</span> by itself will show the attachment type.
+<p>
+<span class=cmd>BC &lt;COLOR&gt;</span><span style='margin-left: 1.3in;'>(set letter board color)</span><p>
+<ul>
+(COLOR is either BLACK or WHITE)
+</ul>
+<p>
+<span class=cmd>PW &lt;PASSWORD&gt;</span><span style='margin-left: 1in;'>(change Password - no spaces in password)</span><br>
+<span class=cmd>PW -</span><span style='margin-left: 2.8in;'>(remove the Password)</span>
+<p>
+<span class=cmd>RN &lt;NEW NAME&gt;</span><span style='margin-left: 1in;'>(rename the brigade, no spaces in new name)</span>
+<ul>
+The new name should have only letters and numbers.
+</ul>
+<h2>Letters</h2>
+<span class=cmd>BA &lt;LETTER&gt;  ## ...</span><span style='margin-left: 1in;'>(BA = Bulk Add)</span>
+<pre>
+    LETTER is a single character or one of these two letter sequences:
+        SP   space
+        HT   red heart <span style='color: red;'>&#10084;</span>
+        DN   down arrow <span style='font-size: 23pt; font-weight: bold;'>&#8595;</span>
+        UP   up arrow <span style='font-size: 23pt; font-weight: bold;'>&#8593;</span>
+
+    ## is a number - how many of the LETTER you have.
+
+    You can put multiple &lt;LETTER&gt; ## in a row like this:
+
+        BA   A 3  B 4  C 2  D 3  E 10  ! 1  $ 2  SP 8
+
+     or another way:
+
+        BA   A3  B4  SP10  !3
+
+    LETTER can be <i>any</i> character including
+        punctuation (non alpha-numeric) characters.
+        There <i>is</i> one exception: tilde <span style='font-size: 22pt;'>~</span> is not permitted.
+</pre>
+<span class=cmd>ADD &lt;LETTER&gt; ...</span><span style='margin-left: 1in;'>(increment the numbers for the letters)</span>
+<pre>
+    Example: ADD  S  S  U  Z          (add two S, a U, and a Z)
+</pre>
+<span class=cmd>SUB &lt;LETTER&gt;</span><span style='margin-left: 1in;'>(decrement the number for the <i>one</i> letter)</span><br>
+<ul>
+(If there are none left the letter will be removed)
+</ul>
+<p>
+<span class=cmd>L</span><span style='margin-left: 1in;'>(List all of the letters and numbers and the total)</span>
+<p>
+Compare the number of letters to those in another brigade:
+<p>
+<span class=cmd>CL &lt;NAME&gt;</span><br>
+<span class=cmd>CL &lt;NAME&gt; &lt;PASSWORD&gt;</span>
+<ul>
+(Using <span class=cmd>CLO</span> will only show where there is a difference)
+</ul>
+
+<h2>Testing Messages</h2>
+To test a message to see if there are enough letters
+simply enter the message in the text field and hit Return.
+<p>
+<span style='background: yellow;'>Note</span>: If the message begins with a number precede it with a slash.  Like this:
+<ul>
+/ 8 MILLION FOR NO KINGS
+</ul>
+The slash will not be included in the message.  It is there so the number is not
+viewed as a date.
+<p>
+If there are not enough letters to make the message you will see
+which additional letters need to be made.
+If there are not enough 0s or 1s it will substitute O for 0 and I for 1.
+<p>
+If there ARE enough letters it will say “Okay &#128077; &#128522;”<br>
+or<br>
+If there are NOT enough letters it will say “IF those are made ...”
+<p>
+and then it will display the total number of letter boards
+that are needed for the message.
+<p>
+    If the attachment type is PVC it will show:
+<p>
+<pre>
+        - how the message will <i>actually</i> look when supported by the PVC pipes
+        - how many T, J, I, and S pipes are needed to support the message
+        <table style='margin-left: 16mm;'>
+        <tr><td>T</td><td>- pipe with a “tee”</td></tr>
+        <tr><td>J</td><td>- pipe with a “union connector”</td></tr>
+        <tr><td>I</td><td>- a plain pipe</td></tr>
+        <tr><td>S</td><td>- a short pipe</td></tr>
+        </table></pre>
+You can click on the displayed message to copy it to the clipboard
+so you can easily paste it.  Perhaps you want to modify it or
+try the message in another brigade that has a different set of letters.
+<h2>Message History</h2>
+To add a message to the brigade's message history:
+<p>
+<span class=cmd>&lt;DATE&gt; &lt;MESSAGE&gt;</span>
+<pre>
+    where DATE can be:
+
+        4/5/2025
+        4/5/25
+        4/5     (current year)
+        4       (current month/year)
+        T       (today)
+</pre>
+If MESSAGE is just a dash ‘-’, the message on that date will be deleted
+<p>
+With a successful Okay &#128077; &#128522; message displayed on the screen
+you can easily add it to the history with this:
+<p>
+<span class=cmd>U &lt;DATE&gt;</span><span style='margin-left: 1in;'>(Use this message on the date)</span>
+<p>
+Note that you CAN add more than one message on a given date.
+<p>
+After adding a message there will be a button: <img src=add_msg.png height='40px'>.
+This will add the message to the <i>National</i> VB Message Library.
+Here is the <a target=_blank href='https://logicalpoetry.com/ml/help.html'>help document</a> for that library. 
+<p>
+<span class=cmd>H</span><span style='margin-left: 1in;'>(Show the complete message History)</span>
+<ul>
+In two columns: Date and Message with the most recent dates first.
+<p>
+At the bottom is a link: <span class=blue>CSV Export</span>.
+Clicking on it will download a comma-separated-value formatted file
+that you can open in a spreadsheet.
+</ul>
+<h2>Messages for ALL Brigades</h2>
+<span class=cmd>LM</span><span style='margin-left: 1.2in;'>(show the unique messages from ALL brigades)</span>
+<p>
+<span class=cmd>LMD</span><span style='margin-left: 1in;'>(show the message history for ALL brigades including dates)</span>
+<p>
+These two commands also have a <span class=blue>CVS Export</span> link at the bottom.
+<p>
+<span class=cmd>SM &lt;term&gt;</span><span style='margin-left: 1in;'>(search ALL brigade messages for the search term)</span>
+<h2>Log</h2>
+<span class=cmd>LG</span><span style='margin-left: 2in;'>(show a time stamped log of activity)</span><br>
+<span class=cmd>LG CLEAR</span><span style='margin-left: 1in;'>(clear the log)</span>
+<h2>Bookmarks</h2>
+You can make a bookmark to go directly to your brigade.
+<p>
+If you have just one brigade this is the URL to bookmark:
+<ul>
+    logicalpoetry.com/vb
+</ul>
+If you have more than one set of letters and the brigade name is XXX 
+this is the URL to bookmark:
+<ul>
+    logicalpoetry.com/cgi-bin/vb?cmd=v+XXX
+</ul>
+and if it has a password of YYY:
+<ul>
+    logicalpoetry.com/cgi-bin/vb?cmd=v+XXX+YYY
+</ul>
+<h2>Imports</h2>
+You can import letter counts or dated messages
+from a .csv (<span class=red>c</span>omma <span class=red>s</span>eparated <span class=red>v</span>alues) file.
+<p>
+The command <span class=cmd>IM</span> begins the process.
+You then choose a file on your computer in the proper format
+and press 'Import' to import it.
+<p>
+A letter count file must have just two lines and look like this:
+<pre style='margin-left: .6in;'>
+A,B,C,F,Q,$,!
+7,4,2,2,1,1,1
+</pre>
+A dated message file can have many lines and must look like this:
+<pre style='margin-left: .6in;'>
+2/3/2025,POTUS IS PUTIN'S PUPPET
+12/31,DEFEND DEMOCRACY
+7/4/26,CELEBRATE INDEPENDENCE FROM FASCISM
+</pre>
+The date can be in a variety of formats as shown above.
+<p>
+<hr width=900 align=left>
+Any questions?
+<br>
+Contact Jon Bjornstad <a href='mailto:Jon Bjornstad <jon.bjornstad@gmail.com>?subject=Visibility Brigade Utility'>jon.bjornstad@gmail.com</a> 415-246-6499
+</body>
+</html>

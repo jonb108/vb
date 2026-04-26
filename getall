@@ -1,6 +1,10 @@
 #!/bin/sh
-scp lp:/home/logical9/www/cgi-bin/vb \
-    lp:/home/logical9/www/cgi-bin/VB_SVG.pm \
+dir=/home/logical9/www/cgi-bin
+ssh lp "cd $dir; tar cvf vblog.tar vblog"
+ssh lp "cd $dir; tar cvf vbdbm.tar brigades"
+scp lp:$dir/vb \
+    lp:$dir/VB_SVG.pm \
     lp:/home/logical9/www/vb/help.html \
-    lp:/home/logical9/www/cgi-bin/brigades/*.dbm \
+    lp:$dir/vblog.tar \
+    lp:$dir/vbdbm.tar \
     .
