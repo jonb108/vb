@@ -2,6 +2,8 @@
 use strict;
 use warnings;
 
+use lib '.';
+
 use CGI;
 my $q = CGI->new();
 use DB_File;
@@ -28,10 +30,20 @@ use VB_SVG qw/
 #     woodland and sac first
 #     with different connection types
 #
+#
+#############
+# NEW ... cannot have apostrophes in brigade names!
+# only A-Z0-9    they should be short!
+# the title can be whatever you like as descriptive as you like
+#
+# RN - check for existing name
+#      rename log as well!
+# super user command to see all log activity?
+#
 my $fmt   = "%m/%d/%y";
 my $reserved_words = "name|title|password|attach_type|board_color";
 my $master_pass = "QAZX";
-my $two_let = qr{\A (SP|HT|DN|UP) \z}xms;
+my $two_let = '(SP|HT|DN|UP)';
 
 sub JON {
     open my $out, '>>', '/tmp/jon';
@@ -50,6 +62,20 @@ sub rest_quote {
     $s =~ s{JQXZ}{'}xmsg;    # hack to avoid quoting issues
     $s =~ s{ZXQJ}{"}xmsg;    # hack to avoid quoting issues
     return $s;
+}
+
+sub add_to_library_form {
+    my ($mess, $d8) = @_;
+    $mess =~ s{'}{&#39;}xmsg;
+    $mess =~ s{"}{&#34;}xmsg;
+    return <<"EOH";
+<form target=_blank action='https://logicalpoetry.com/cgi-bin/ml'>
+<input type=hidden name=cmd value=add_from_vb>
+<input type=hidden name=message value='$mess'>
+<input type=hidden name=d8 value='$d8'>
+<input type=submit id=sub value='Add to Message Library'>
+</form>
+EOH
 }
 
 
@@ -154,7 +180,7 @@ if ($csv_file) {
     $cmd = '';
 }
 
-$cmd =~ s{[^A-Z0-9:.;,)(/&%#$"!?+=*@<> ~-]}{'}xmsgi;    # no smart quotes 
+$cmd =~ s{[^A-Z0-9:.;,)(/&%#\$"!?+=*@<> ~_-]}{'}xmsgi;    # no smart quotes 
     # I tried a smarter way and failed.
 
 $cmd =~ s{\A \s* | \s* \z}{}xmsg;   # trim leading, trailing space
@@ -242,10 +268,13 @@ TOP:
 #
 # first, which brigade are we dealing with?
 #
-if ($cmd =~ m{\A NEW \s+ (\S+) \s+ (.*) \z}xms) {
+if ($cmd =~ m{\A NEW \s+ (\S+) \s+ (\S+) \z}xms) {
     my $name = $1;
     if ($name =~ m{[<].*[>]}xms) {
         $msg = "Do not include the < and > around your name!";
+    }
+    elsif ($name !~ m{\A [a-z0-9]+ \z}xmsi) {
+        $msg = "Only letters and numbers in the brigade name.";
     }
     elsif (-f "brigades/$name.dbm") {
         $msg = "$name already exists";
@@ -265,6 +294,9 @@ elsif ($cmd =~ m{\A NEW \s+ (\S+) \z}xms) {
     my $name = $1;
     if ($name =~ m{[<].*[>]}xms) {
         $msg = "Do not include the < and > around your name!";
+    }
+    elsif ($name !~ m{\A [a-z0-9]+ \z}xmsi) {
+        $msg = "Only letters and numbers in the brigade name.";
     }
     elsif (-f "brigades/$name.dbm") {
         $msg = "$name already exists";
@@ -399,9 +431,69 @@ sub add_it {
     }
 }
 
+sub bulk_add {
+    my ($let_nums) = @_;
+    if (! $br) {
+        $msg = "No brigade";
+        return;
+    }
+    my @terms = split ' ', $let_nums;
+    my $n = 0;
+    my ($key, $val);
+    TERM:
+    while (@terms) {
+        my $term = uc shift @terms;
+        my $lt = length($term);
+        if ($lt >= 2) {
+            my $l2 = $term =~ m{\A $two_let}xms;
+            if ($lt >= 3 && $l2) {
+                $key = substr($term, 0, 2); 
+                $val = substr($term, 2);
+            }
+            elsif ($l2 && $lt == 2) {
+                $key = $term;
+                $val = shift @terms;
+                if (! $val) {
+                    $msg .= "missing number for $key<br>";
+                    next TERM;
+                }
+            }
+            else {
+                $key = substr($term, 0, 1); 
+                $val = substr($term, 1); 
+            }
+        }
+        else {
+            $key = $term;
+            $val = shift @terms;
+            if (! $val) {
+                $msg .= "missing number for $key<br>";
+                next TERM;
+            }
+        }
+        if ($key eq '~'
+            || (length $key != 1 && $key !~ m{\A $two_let \z}xms)
+        ) {
+            $msg .= "illegal letter: $key<br>";
+            next TERM;
+        }
+        elsif ($val !~ m{\A \d+ \z}xms) {
+            $msg = "illegal num: $val<br>";
+            next TERM;
+        }
+        else {
+            $br{$key} = $val;
+            ++$n;
+        }
+    }
+    if ($n) {
+        $msg .= "$n added";
+    }
+}
+
 if ($cmd =~ m{\A ADD \s+ (\S.*) \z}xmsi) {
     if (! $br) {
-        $msg = "no brigade";
+        $msg = "No brigade";
     }
     else {
         my $lets = $1;
@@ -409,7 +501,7 @@ if ($cmd =~ m{\A ADD \s+ (\S.*) \z}xmsi) {
         # increment the letter count for each letter
         LETS:
         for my $l (@lets) {
-            if ($l =~ $two_let) {
+            if ($l =~ m{\A $two_let \z}xms) {
                 bump($l);
             }
             else {
@@ -424,7 +516,7 @@ if ($cmd =~ m{\A ADD \s+ (\S.*) \z}xmsi) {
 elsif ($cmd =~ m{\A SUB \s* (\S+) \z}xmsi) {
     my $let = $1;
     if (! $br) {
-        $msg = "no brigade";
+        $msg = "No brigade";
     }
     else {
         # decrement the letter count
@@ -447,7 +539,7 @@ elsif ($cmd =~ m{\A SUB \s* (\S+) \z}xmsi) {
 elsif ($cmd eq 'IM') {
     # import letters and counts from a .csv file
     if (! $br) {
-        $msg = "no brigade";
+        $msg = "No brigade";
     }
     else {
         $msg = <<"EOH";
@@ -457,14 +549,14 @@ Importing Letter Counts or Dated Messages
 <input type=hidden name=br value='$br{name}'>
 <input type=hidden name=password value='$br{password}'>
 CSV File: <input type=file name=csv_file><p>
-<input id=sub type=submit style='background: lightgreen' value='Import'>
+<input id=sub type=submit value='Import'>
 </form>
 EOH
     }
 }
 elsif ($cmd =~ m{\A TL \s+ (.*) \z}xmsi) {
     if (! $br) {
-        $msg = "no brigade";
+        $msg = "No brigade";
     }
     else {
         $br{title} = $1;
@@ -481,7 +573,7 @@ elsif ($cmd eq 'BC') {
 elsif ($cmd =~ m{\A BC \s+ (\S+) \z}xmsi) {
     my $bc = $1;
     if (! $br) {
-        $msg = "no brigade";
+        $msg = "No brigade";
     }
     elsif ($bc ne 'BLACK' && $bc ne 'WHITE') {
         $msg = 'board color is either BLACK or WHITE';
@@ -493,7 +585,7 @@ elsif ($cmd =~ m{\A BC \s+ (\S+) \z}xmsi) {
 }
 elsif ($cmd =~ m{\A PW \s+ (\S+) \z}xmsi) {
     if (! $br) {
-        $msg = "no brigade";
+        $msg = "No brigade";
     }
     else {
         my $pwd = $1;
@@ -509,44 +601,7 @@ elsif ($cmd =~ m{\A PW \s+ (\S+) \z}xmsi) {
     }
 }
 elsif ($cmd =~ m{\A BA \s (.*) \z}xmsi) {
-    if (! $br) {
-        $msg = "no brigade";
-    }
-    else {
-        my $let_nums = $1;
-        my @terms = split ' ', $let_nums;
-        if (@terms % 2 != 0) {
-            $msg = "odd number of parameters :(";
-        }
-        else {
-            my $n = 0;
-            TERM:
-            while (@terms) {
-                my $key = uc shift @terms;
-                my $val = shift @terms;
-                if ($key eq '~'
-                    || (length $key != 1 && $key !~ $two_let)
-                ) {
-                    $msg = "illegal letter: $key";
-                    last TERM;
-                }
-                elsif ($val !~ m{\A \d+ \z}xms) {
-                    $msg = "illegal num: $val";
-                    last TERM;
-                }
-                else {
-                    $br{$key} = $val;
-                    ++$n;
-                }
-            }
-            if ($n) {
-                if ($msg) {
-                    $msg .= ', ';
-                }
-                $msg .= "$n added";
-            }
-        }
-    }
+    bulk_add($1);
 }
 elsif ($cmd =~ m{\A (CLO?) \s+ (\S+) \s+ (\S+) \z}xms) {
     $msg = let_compare($1, $2, $3);
@@ -598,7 +653,7 @@ elsif ($cmd eq 'L') {
              . $q->span({ class => 'total' }, "<p>Total $total"));
     }
 }
-elsif ($cmd =~ m{\A U \s+ ([\d/]+|T) \z}xms) {
+elsif ($cmd =~ m{\A U \s+ (\d[\d/]*|T) \z}xms) {
     if (! $br) {
         $msg = "No brigade";
     }
@@ -614,11 +669,12 @@ elsif ($cmd =~ m{\A U \s+ ([\d/]+|T) \z}xms) {
         }
         else {
             $br{$dt->as_d8()} .= rest_quote($message) . "~";
-            $msg = "added on " . $dt->format($fmt);
+            $msg = "added on " . $dt->format($fmt)
+                 . add_to_library_form($message, $dt->as_d8());
         }
     }
 }
-elsif ($cmd =~ m{\A ([\d/]+|T) \s+ (.*) \z}xms) {
+elsif ($cmd =~ m{\A (\d[\d/]*|T) \s+ (.*) \z}xms) {
     if (! $br) {
         $msg = "No brigade";
     }
@@ -651,7 +707,8 @@ elsif ($cmd =~ m{\A ([\d/]+|T) \s+ (.*) \z}xms) {
             }
             else {
                 $br{$k} .= rest_quote($message) . "~";
-                $msg = "message added on $d";
+                $msg = "message added on $d"
+                     . add_to_library_form($message, $dt->as_d8());
             }
         }
     }
@@ -926,6 +983,12 @@ elsif ($cmd =~ m{\A RN \s+ (\S+) \z}xms) {
     if (! $br) {
         $msg = "No brigade";
     }
+    elsif (-f "brigades/$new_name.dbm") {
+        $msg = "Sorry, that name already exists.";
+    }
+    elsif ($new_name !~ m{\A [a-z0-9]+ \z}xmsi) {
+        $msg = "Only letters and numbers in the new brigade name.";
+    }
     else {
         my $old_name = $br;
         untie %br;
@@ -965,6 +1028,10 @@ elsif ($cmd =~ m{\S}xms) {
         $msg = "cannot use ~ in a message";
     }
     else {
+        # remove a leading slash 
+        # useful for messages that begin with a digit
+        #
+        $cmd =~ s{\A \s* [/] \s* }{}xms;
         my $cmd1 = repl_quote($cmd);
         $msg = qq!<span class='big green' onclick='copy_to_clipboard("$cmd1")'>$cmd</span><span style='margin-left: .5in; color: gray;' id=copied></span><p>\n!;
         my %freq;
@@ -999,47 +1066,10 @@ elsif ($cmd =~ m{\S}xms) {
         my $th = $n_needed == 1? "it is": "those are";
         my $ok = $err? "IF $th made..."
                 :      "Okay &#128077; &#128522;";
-        $msg .= "<p>$ok $nl letter boards"
-             .  "<p><span class='fixed green2'>";
+        $msg .= "<p>$ok $nl letter boards<p>";
         if (exists $br{attach_type} && $br{attach_type} eq 'PVC') {
             # now to figure out the PVC pipe needs
             my ($T, $J, $I, $S) = (0, 0, 0, 0);
-
-=comment
-            # old code before Angie's SVG
-
-            my $PVC;
-            my $i = 0;
-            while (my $l4 = substr($cmd, $i, 4)) {
-                $msg .= "|$l4";
-                $PVC .= "T";
-                $i += 4;
-                ++$T;
-                my $len = length $l4;
-                if ($len == 4) {
-                    ++$J;
-                    ++$I;
-                    $PVC .= " JI ";
-                }
-                elsif ($len == 3) {
-                    ++$J;
-                    ++$S;
-                    $PVC .= " JS";
-                }
-                elsif ($len == 2) {
-                    ++$I;
-                    $PVC .= "I ";
-                }
-                elsif ($len == 1) {
-                    ++$S;
-                    $PVC .= "S";
-                }
-            }
-            $msg .= '|</span>';
-            $PVC .= 'T';
-            $msg .= "<br><span class=fixed>$PVC</span>";
-
-=cut
 
             my $i = 0;
             while (my $l4 = substr($cmd, $i, 4)) {
@@ -1155,6 +1185,9 @@ a {
     position: absolute;
     left: 12mm;
 }
+#sub {
+    background: lightgreen;
+}
 </style>
 <script>
 function set_focus() {
@@ -1178,7 +1211,7 @@ function copy_to_clipboard(msg) {
 <body>
 <img src=/vb/antifa_fascism.jpg width=100%>
 <h1>VISIBILITY BRIGADE
-<a class=help target=_blank href=/vb/brigade_help.html>Help</a>
+<a class=help target=_blank href=/vb/help.html>Help</a>
 </h1>
 EOH
 if ($br) {

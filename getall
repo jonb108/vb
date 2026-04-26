@@ -1,7 +1,6 @@
 #!/bin/sh
 scp lp:/home/logical9/www/cgi-bin/vb \
-    lp:/home/logical9/www/cgi-bin/vb2 \
     lp:/home/logical9/www/cgi-bin/VB_SVG.pm \
-    lp:/home/logical9/www/vb/brigade_help.html \
+    lp:/home/logical9/www/vb/help.html \
     lp:/home/logical9/www/cgi-bin/brigades/*.dbm \
     .
